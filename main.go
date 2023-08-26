@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -25,6 +26,9 @@ type AppDetails struct {
 }
 
 func main() {
+	listenPort := flag.String("port", "8080", "Listen port")
+	flag.Parse()
+
 	if FILE_STORAGE_PATH == "" {
 		log.Fatal("You must provide a file storage path")
 	}
@@ -61,7 +65,7 @@ func main() {
 			return
 		}
 
-		dir := fmt.Sprintf("./apps/%s/%s/%s", appDetails.AppName, appDetails.AppVersion, appDetails.AppBuild)
+		dir := fmt.Sprintf("%s/%s/%s/%s", FILE_STORAGE_PATH, appDetails.AppName, appDetails.AppVersion, appDetails.AppBuild)
 		err = os.MkdirAll(dir, os.ModePerm)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -90,19 +94,20 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("File %s uploaded successfully", file.Filename), "release": release})
 	})
 
-	r.GET("/apps/:app_name/:app_version/:app_build/binary.app", func(c *gin.Context) {
+	r.GET("/apps/:app_name/:app_version/:app_build/:file_name", func(c *gin.Context) {
 		appName := c.Param("app_name")
 		appVersion := c.Param("app_version")
 		appBuild := c.Param("app_build")
+		fileName := c.Param("file_name")
 
-		if appName == "" || appVersion == "" || appBuild == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing app name, version or build"})
+		if appName == "" || appVersion == "" || appBuild == "" || fileName == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing parameters: app name, version, build or file name"})
 			return
 		}
 
-		filePath := fmt.Sprintf("./apps/%s/%s/%s/binary.app", appName, appVersion, appBuild)
+		filePath := fmt.Sprintf("%s/%s/%s/%s/%s", FILE_STORAGE_PATH, appName, appVersion, appBuild, fileName)
 		c.File(filePath)
 	})
 
-	r.Run(":8080")
+	r.Run(fmt.Sprintf(":%s", *listenPort))
 }
