@@ -35,6 +35,10 @@ func main() {
 		log.Fatal("You must provide a file storage path")
 	}
 
+	// print user name and password length
+	log.Println("Length of backend username:", len(common.GetBackendUsername()))
+	log.Println("Length of backend password:", len(common.GetBackendPassword()))
+
 	r := gin.Default()
 
 	client := db.NewClient()
@@ -45,7 +49,7 @@ func main() {
 	prismaCtx := context.Background()
 
 	authorized := r.Group("/", gin.BasicAuth(gin.Accounts{
-		"admin": "password", // replace with your own user and password
+		common.GetBackendUsername(): common.GetBackendPassword(),
 	}))
 
 	authorized.POST("/admin/upload/app", func(c *gin.Context) {

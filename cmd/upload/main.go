@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/dahchon/app-release-server/common"
 )
 
 type AppDetails struct {
@@ -20,8 +22,8 @@ type AppDetails struct {
 }
 
 var (
-	BACKEND_USERNAME = os.Getenv("ARS_BACKEND_USERNAME")
-	BACKEND_PASSWORD = os.Getenv("ARS_BACKEND_PASSWORD")
+	BACKEND_USERNAME = common.GetBackendUsername()
+	BACKEND_PASSWORD = common.GetBackendPassword()
 )
 
 func main() {
