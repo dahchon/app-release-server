@@ -1,5 +1,5 @@
 # define env var
-export DATABASE_URL=file:./tmp/dev.db
+DATABASE_URL?=file:./tmp/dev.db
 
 db-push:
-	go run github.com/steebchen/prisma-client-go db push
+	export DATABASE_URL=$(DATABASE_URL) && go run github.com/steebchen/prisma-client-go db push
