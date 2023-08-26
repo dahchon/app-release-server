@@ -58,3 +58,4 @@ tmp/
 
 .vscode/
 __debug_bin
+app-release-server

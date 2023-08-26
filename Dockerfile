@@ -11,12 +11,10 @@ RUN go run github.com/steebchen/prisma-client-go prefetch
 
 COPY . ./
 
-# generate the Prisma Client Go client
 RUN go run github.com/steebchen/prisma-client-go generate
-# or, if you use go generate to run the generator, use the following line instead
-# RUN go generate ./...
 
-# build the binary with all dependencies
+ENV CGO_ENABLED=0
+
 RUN go build -o /app-release-server .
 
 CMD ["/app"]
@@ -26,3 +24,5 @@ FROM debian:bullseye-slim as production
 WORKDIR /app
 
 COPY --from=build /app-release-server /app
+
+CMD ["/app/app-release-server"]
