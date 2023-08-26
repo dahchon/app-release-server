@@ -19,6 +19,11 @@ type AppDetails struct {
 	GitCommit  string `json:"git_commit,omitempty"`
 }
 
+var (
+	BACKEND_USERNAME = os.Getenv("ARS_BACKEND_USERNAME")
+	BACKEND_PASSWORD = os.Getenv("ARS_BACKEND_PASSWORD")
+)
+
 func main() {
 	// Define flags
 	filePath := flag.String("file", "", "Path to the file being uploaded")
@@ -102,7 +107,7 @@ func main() {
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	// Add basic authentication
-	req.SetBasicAuth("admin", "password") // replace with your own user and password
+	req.SetBasicAuth(BACKEND_USERNAME, BACKEND_PASSWORD)
 
 	// Do the request
 	client := &http.Client{}
@@ -118,5 +123,6 @@ func main() {
 		fmt.Println("File uploaded successfully")
 	} else {
 		fmt.Println("Failed to upload file")
+		os.Exit(1)
 	}
 }
