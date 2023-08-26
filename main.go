@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -13,7 +14,8 @@ import (
 
 	"github.com/dahchon/app-release-server/common"
 	"github.com/dahchon/app-release-server/db"
-	"github.com/gin-gonic/gin"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 var (
@@ -39,50 +41,71 @@ func main() {
 	log.Println("Length of backend username:", len(common.GetBackendUsername()))
 	log.Println("Length of backend password:", len(common.GetBackendPassword()))
 
-	r := gin.Default()
+	e := echo.New()
+
+	// Middleware
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
 
 	client := db.NewClient()
-	connetErr := client.Connect()
-	if connetErr != nil {
-		log.Fatal(connetErr)
+	connectErr := client.Connect()
+	if connectErr != nil {
+		log.Fatal(connectErr)
 	}
 	prismaCtx := context.Background()
 
-	authorized := r.Group("/", gin.BasicAuth(gin.Accounts{
-		common.GetBackendUsername(): common.GetBackendPassword(),
+	e.Use(middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
+		if username == common.GetBackendUsername() && password == common.GetBackendPassword() {
+			return true, nil
+		}
+		return false, nil
 	}))
 
-	authorized.POST("/admin/upload/app", func(c *gin.Context) {
+	e.POST("/admin/upload/app", func(c echo.Context) error {
 		file, err := c.FormFile("file")
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 		}
 
-		detailsStr := c.PostForm("details")
+		detailsStr := c.FormValue("details")
 		var appDetails AppDetails
 		if err := json.Unmarshal([]byte(detailsStr), &appDetails); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 		}
 
 		if appDetails.AppName == "" || appDetails.AppVersion == "" || appDetails.AppBuild == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing app name, version or build"})
-			return
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Missing app name, version or build"})
 		}
 
 		dir := fmt.Sprintf("%s/%s/%s/%s", FILE_STORAGE_PATH, appDetails.AppName, appDetails.AppVersion, appDetails.AppBuild)
 		err = os.MkdirAll(dir, os.ModePerm)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
 		fileName := filepath.Base(file.Filename)
 		dst := fmt.Sprintf("%s/%s", dir, fileName)
-		if err := c.SaveUploadedFile(file, dst); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+		// if err := c.SaveUploadedFile(file, dst); err != nil {
+		// 	return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		// }
+		// echo framework save uploaded file to dst
+		// Destination
+
+		src, err := file.Open()
+		if err != nil {
+			return err
+		}
+		defer src.Close()
+
+		opendFile, err := os.Create(dst)
+		if err != nil {
+			return err
+		}
+		defer opendFile.Close()
+
+		// Copy
+		if _, err = io.Copy(opendFile, src); err != nil {
+			return err
 		}
 
 		release, err := client.AppRelease.CreateOne(
@@ -95,34 +118,31 @@ func main() {
 
 		if err != nil {
 			log.Println(err.Error())
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
-		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("File %s uploaded successfully", file.Filename), "release": release})
+		return c.JSON(http.StatusOK, map[string]interface{}{"message": fmt.Sprintf("File %s uploaded successfully", file.Filename), "release": release})
 	})
 
-	r.GET("/apps/:app_name/:app_version/:app_build/:file_name", func(c *gin.Context) {
+	e.GET("/apps/:app_name/:app_version/:app_build/:file_name", func(c echo.Context) error {
 		appName := c.Param("app_name")
 		appVersion := c.Param("app_version")
 		appBuild := c.Param("app_build")
 		fileName := c.Param("file_name")
 
 		if appName == "" || appVersion == "" || appBuild == "" || fileName == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing parameters: app name, version, build or file name"})
-			return
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Missing parameters: app name, version, build or file name"})
 		}
 
 		filePath := fmt.Sprintf("%s/%s/%s/%s/%s", FILE_STORAGE_PATH, appName, appVersion, appBuild, fileName)
-		c.File(filePath)
+		return c.File(filePath)
 	})
 
-	r.GET("/apps/:app_name/latest", func(c *gin.Context) {
+	e.GET("/apps/:app_name/latest", func(c echo.Context) error {
 		// get the metadata for the latest release
 		appName := c.Param("app_name")
 		if appName == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing parameter: app name"})
-			return
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Missing parameter: app name"})
 		}
 
 		release, err := client.AppRelease.FindFirst(
@@ -132,16 +152,14 @@ func main() {
 		).Exec(prismaCtx)
 
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
 		if release == nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "No release found"})
-			return
+			return c.JSON(http.StatusNotFound, map[string]string{"error": "No release found"})
 		}
 
-		requestHost := c.Request.Host
+		requestHost := c.Request().Host
 
 		latest_model := common.AppLatestModel{
 			AppVersion:  release.AppVersion,
@@ -150,8 +168,8 @@ func main() {
 			DownloadURL: fmt.Sprintf("https://%s/apps/%s/%s/%s/%s", requestHost, release.AppName, release.AppVersion, release.AppBuild, release.MainFileName),
 		}
 
-		c.JSON(http.StatusOK, latest_model)
+		return c.JSON(http.StatusOK, latest_model)
 	})
 
-	r.Run(fmt.Sprintf(":%s", *listenPort))
+	e.Start(fmt.Sprintf(":%s", *listenPort))
 }
