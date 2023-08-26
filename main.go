@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/dahchon/app-release-server/db"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,6 +18,8 @@ type AppDetails struct {
 
 func main() {
 	r := gin.Default()
+
+	client := db.NewClient()
 
 	authorized := r.Group("/", gin.BasicAuth(gin.Accounts{
 		"admin": "password", // replace with your own user and password

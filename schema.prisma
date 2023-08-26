@@ -1,5 +1,4 @@
 datasource db {
-  // could be postgresql or mysql
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }
@@ -8,11 +7,19 @@ generator db {
   provider = "go run github.com/steebchen/prisma-client-go"
 }
 
-model Post {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  title     String
-  published Boolean
-  desc      String?
+model AppRelease {
+  id          String   @id @default(cuid())
+  appName     String
+  appVersion  String
+  appBuild    String
+  gitCommit   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  title       String?
+  published   Boolean  @default(true)
+  description String?
+
+  @@unique([appName, appVersion, appBuild])
+  // table name
+  @@map("app_releases")
 }
