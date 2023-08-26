@@ -106,12 +106,14 @@ func main() {
 			return err
 		}
 
+		ip := c.RealIP()
 		release, err := client.AppRelease.CreateOne(
 			db.AppRelease.AppName.Set(appDetails.AppName),
 			db.AppRelease.AppVersion.Set(appDetails.AppVersion),
 			db.AppRelease.AppBuild.Set(appDetails.AppBuild),
 			db.AppRelease.GitCommit.Set(appDetails.GitCommit),
 			db.AppRelease.MainFileName.Set(fileName),
+			db.AppRelease.UploaderIP.Set(ip),
 		).Exec(c.Request().Context())
 
 		if err != nil {

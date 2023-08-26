@@ -20,6 +20,7 @@ model AppRelease {
   published     Boolean  @default(true)
   description   String?
   downloadCount Int      @default(0)
+  uploaderIP    String?
 
   @@unique([appName, appVersion, appBuild])
   // table name
