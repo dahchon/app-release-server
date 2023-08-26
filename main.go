@@ -3,11 +3,18 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
+	"encoding/json"
+
 	"github.com/dahchon/app-release-server/db"
 	"github.com/gin-gonic/gin"
+)
+
+var (
+	FILE_STORAGE_PATH = os.Getenv("ARS_FILE_STORAGE_PATH")
 )
 
 type AppDetails struct {
@@ -18,10 +25,18 @@ type AppDetails struct {
 }
 
 func main() {
+	if FILE_STORAGE_PATH == "" {
+		log.Fatal("You must provide a file storage path")
+	}
+
 	r := gin.Default()
 
 	client := db.NewClient()
-	ctx := context.Background()
+	connetErr := client.Connect()
+	if connetErr != nil {
+		log.Fatal(connetErr)
+	}
+	prismaCtx := context.Background()
 
 	authorized := r.Group("/", gin.BasicAuth(gin.Accounts{
 		"admin": "password", // replace with your own user and password
@@ -34,18 +49,19 @@ func main() {
 			return
 		}
 
-		var json AppDetails
-		if err := c.ShouldBindJSON(&json); err != nil {
+		detailsStr := c.PostForm("details")
+		var appDetails AppDetails
+		if err := json.Unmarshal([]byte(detailsStr), &appDetails); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		if json.AppName == "" || json.AppVersion == "" || json.AppBuild == "" {
+		if appDetails.AppName == "" || appDetails.AppVersion == "" || appDetails.AppBuild == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing app name, version or build"})
 			return
 		}
 
-		dir := fmt.Sprintf("./apps/%s/%s/%s", json.AppName, json.AppVersion, json.AppBuild)
+		dir := fmt.Sprintf("./apps/%s/%s/%s", appDetails.AppName, appDetails.AppVersion, appDetails.AppBuild)
 		err = os.MkdirAll(dir, os.ModePerm)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -59,13 +75,14 @@ func main() {
 		}
 
 		release, err := client.AppRelease.CreateOne(
-			db.AppRelease.AppName.Set(json.AppName),
-			db.AppRelease.AppVersion.Set(json.AppVersion),
-			db.AppRelease.AppBuild.Set(json.AppBuild),
-			db.AppRelease.GitCommit.Set(json.GitCommit),
-		).Exec(c)
+			db.AppRelease.AppName.Set(appDetails.AppName),
+			db.AppRelease.AppVersion.Set(appDetails.AppVersion),
+			db.AppRelease.AppBuild.Set(appDetails.AppBuild),
+			db.AppRelease.GitCommit.Set(appDetails.GitCommit),
+		).Exec(prismaCtx)
 
 		if err != nil {
+			log.Println(err.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}

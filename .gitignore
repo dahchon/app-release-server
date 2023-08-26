@@ -55,3 +55,6 @@ Temporary Items
 tmp/
 *.db
 *.sqlite3
+
+.vscode/
+__debug_bin
