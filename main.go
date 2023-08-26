@@ -137,11 +137,13 @@ func main() {
 			return
 		}
 
+		requestHost := c.Request.Host
+
 		latest_model := common.AppLatestModel{
 			AppVersion:  release.AppVersion,
 			AppBuild:    release.AppBuild,
 			AppName:     release.AppName,
-			DownloadURL: fmt.Sprintf("/apps/%s/%s/%s/%s", release.AppName, release.AppVersion, release.AppBuild, release.MainFileName),
+			DownloadURL: fmt.Sprintf("https://%s/apps/%s/%s/%s/%s", requestHost, release.AppName, release.AppVersion, release.AppBuild, release.MainFileName),
 		}
 
 		c.JSON(http.StatusOK, latest_model)
