@@ -8,16 +8,17 @@ generator db {
 }
 
 model AppRelease {
-  id          String   @id @default(cuid())
-  appName     String
-  appVersion  String
-  appBuild    String
-  gitCommit   String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  title       String?
-  published   Boolean  @default(true)
-  description String?
+  id           String   @id @default(cuid())
+  appName      String
+  appVersion   String
+  appBuild     String
+  gitCommit    String
+  mainFileName String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  title        String?
+  published    Boolean  @default(true)
+  description  String?
 
   @@unique([appName, appVersion, appBuild])
   // table name

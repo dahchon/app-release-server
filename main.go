@@ -7,9 +7,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"encoding/json"
 
+	"github.com/dahchon/app-release-server/common"
 	"github.com/dahchon/app-release-server/db"
 	"github.com/gin-gonic/gin"
 )
@@ -72,7 +74,8 @@ func main() {
 			return
 		}
 
-		dst := fmt.Sprintf("%s/binary.app", dir)
+		fileName := filepath.Base(file.Filename)
+		dst := fmt.Sprintf("%s/%s", dir, fileName)
 		if err := c.SaveUploadedFile(file, dst); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -83,6 +86,7 @@ func main() {
 			db.AppRelease.AppVersion.Set(appDetails.AppVersion),
 			db.AppRelease.AppBuild.Set(appDetails.AppBuild),
 			db.AppRelease.GitCommit.Set(appDetails.GitCommit),
+			db.AppRelease.MainFileName.Set(fileName),
 		).Exec(prismaCtx)
 
 		if err != nil {
@@ -133,7 +137,14 @@ func main() {
 			return
 		}
 
-		c.JSON(http.StatusOK, release)
+		latest_model := common.AppLatestModel{
+			AppVersion:  release.AppVersion,
+			AppBuild:    release.AppBuild,
+			AppName:     release.AppName,
+			DownloadURL: fmt.Sprintf("/apps/%s/%s/%s/%s", release.AppName, release.AppVersion, release.AppBuild, release.MainFileName),
+		}
+
+		c.JSON(http.StatusOK, latest_model)
 	})
 
 	r.Run(fmt.Sprintf(":%s", *listenPort))

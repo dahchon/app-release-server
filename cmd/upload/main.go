@@ -118,11 +118,19 @@ func main() {
 	}
 	defer res.Body.Close()
 
+	respBody := &bytes.Buffer{}
+	_, err = io.Copy(respBody, res.Body)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	bodyStr := respBody.String()
 	// Check the response
 	if res.StatusCode == http.StatusOK {
-		fmt.Println("File uploaded successfully")
+		fmt.Printf("File %s uploaded successfully:\n%s", filepath.Base(file.Name()), bodyStr)
 	} else {
-		fmt.Println("Failed to upload file")
+
+		fmt.Printf("Error uploading file: %d\n%s", res.StatusCode, bodyStr)
 		os.Exit(1)
 	}
 }
