@@ -21,7 +21,7 @@ RUN go build -o /app-release-server .
 
 CMD ["/app"]
 
-FROM debian:buster-slim as production
+FROM debian:bullseye-slim as production
 
 WORKDIR /app
 
