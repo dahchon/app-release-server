@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -20,6 +21,7 @@ func main() {
 	r := gin.Default()
 
 	client := db.NewClient()
+	ctx := context.Background()
 
 	authorized := r.Group("/", gin.BasicAuth(gin.Accounts{
 		"admin": "password", // replace with your own user and password
@@ -38,6 +40,11 @@ func main() {
 			return
 		}
 
+		if json.AppName == "" || json.AppVersion == "" || json.AppBuild == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing app name, version or build"})
+			return
+		}
+
 		dir := fmt.Sprintf("./apps/%s/%s/%s", json.AppName, json.AppVersion, json.AppBuild)
 		err = os.MkdirAll(dir, os.ModePerm)
 		if err != nil {
@@ -51,7 +58,19 @@ func main() {
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"message": "File uploaded successfully"})
+		release, err := client.AppRelease.CreateOne(
+			db.AppRelease.AppName.Set(json.AppName),
+			db.AppRelease.AppVersion.Set(json.AppVersion),
+			db.AppRelease.AppBuild.Set(json.AppBuild),
+			db.AppRelease.GitCommit.Set(json.GitCommit),
+		).Exec(c)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("File %s uploaded successfully", file.Filename), "release": release})
 	})
 
 	r.GET("/apps/:app_name/:app_version/:app_build/binary.app", func(c *gin.Context) {
