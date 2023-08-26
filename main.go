@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -52,16 +51,15 @@ func main() {
 	if connectErr != nil {
 		log.Fatal(connectErr)
 	}
-	prismaCtx := context.Background()
-
-	e.Use(middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
+	adminGroup := e.Group("/admin")
+	adminGroup.Use(middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
 		if username == common.GetBackendUsername() && password == common.GetBackendPassword() {
 			return true, nil
 		}
 		return false, nil
 	}))
 
-	e.POST("/admin/upload/app", func(c echo.Context) error {
+	adminGroup.POST("/upload/app", func(c echo.Context) error {
 		file, err := c.FormFile("file")
 		if err != nil {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -114,7 +112,7 @@ func main() {
 			db.AppRelease.AppBuild.Set(appDetails.AppBuild),
 			db.AppRelease.GitCommit.Set(appDetails.GitCommit),
 			db.AppRelease.MainFileName.Set(fileName),
-		).Exec(prismaCtx)
+		).Exec(c.Request().Context())
 
 		if err != nil {
 			log.Println(err.Error())
@@ -134,6 +132,30 @@ func main() {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Missing parameters: app name, version, build or file name"})
 		}
 
+		// find this item in db and increase download count
+		app_release, err := client.AppRelease.FindFirst(
+			db.AppRelease.AppName.Equals(appName),
+			db.AppRelease.AppVersion.Equals(appVersion),
+			db.AppRelease.AppBuild.Equals(appBuild),
+		).Exec(c.Request().Context())
+
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
+
+		_, err = client.AppRelease.FindUnique(
+			db.AppRelease.ID.Equals(app_release.ID),
+		).Update(
+			db.AppRelease.DownloadCount.Set(app_release.DownloadCount + 1),
+		).Exec(c.Request().Context())
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
+
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
+
 		filePath := fmt.Sprintf("%s/%s/%s/%s/%s", FILE_STORAGE_PATH, appName, appVersion, appBuild, fileName)
 		return c.File(filePath)
 	})
@@ -149,7 +171,7 @@ func main() {
 			db.AppRelease.AppName.Equals(appName),
 		).OrderBy(
 			db.AppRelease.CreatedAt.Order(db.SortOrderDesc),
-		).Exec(prismaCtx)
+		).Exec(c.Request().Context())
 
 		if err != nil {
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
