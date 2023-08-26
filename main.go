@@ -109,5 +109,32 @@ func main() {
 		c.File(filePath)
 	})
 
+	r.GET("/apps/:app_name/latest", func(c *gin.Context) {
+		// get the metadata for the latest release
+		appName := c.Param("app_name")
+		if appName == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing parameter: app name"})
+			return
+		}
+
+		release, err := client.AppRelease.FindFirst(
+			db.AppRelease.AppName.Equals(appName),
+		).OrderBy(
+			db.AppRelease.CreatedAt.Order(db.SortOrderDesc),
+		).Exec(prismaCtx)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		if release == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "No release found"})
+			return
+		}
+
+		c.JSON(http.StatusOK, release)
+	})
+
 	r.Run(fmt.Sprintf(":%s", *listenPort))
 }
