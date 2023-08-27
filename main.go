@@ -12,7 +12,7 @@ import (
 	"encoding/json"
 
 	"github.com/dahchon/app-release-server/common"
-	"github.com/dahchon/app-release-server/db"
+	"github.com/dahchon/app-release-server/prisma/db"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )

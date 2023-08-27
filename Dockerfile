@@ -25,10 +25,8 @@ WORKDIR /app
 
 COPY --from=build /app-release-server /app
 
-COPY schema.prisma .
-COPY migrations .
+COPY prisma .
 
 COPY bin/entrypoint.sh .
 
-# CMD ["/app/app-release-server"]
 ENTRYPOINT ["/app/entrypoint.sh"]
