@@ -51,6 +51,7 @@ func main() {
 	if connectErr != nil {
 		log.Fatal(connectErr)
 	}
+
 	adminGroup := e.Group("/admin")
 	adminGroup.Use(middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
 		if username == common.GetBackendUsername() && password == common.GetBackendPassword() {
