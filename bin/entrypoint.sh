@@ -1,6 +1,11 @@
 #!/bin/bash
 
-MODE=${MODE:-"web"}
+MODE=$1
+
+if [ -z "$MODE" ]; then
+  echo "No mode set, defaulting to web"
+  MODE="web"
+fi
 
 if [ "$MODE" = "web" ]; then
   echo "Running web server"
