@@ -12,17 +12,19 @@ model AppRelease {
   appName       String
   appVersion    String
   appBuild      String
+  target        String
+  arch          String
   gitCommit     String
   mainFileName  String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   title         String?
   published     Boolean  @default(true)
-  description   String?
+  releaseNotes  String?
   downloadCount Int      @default(0)
   uploaderIP    String?
 
-  @@unique([appName, appVersion, appBuild])
+  @@unique([appName, appVersion, appBuild, target, arch])
   // table name
   @@map("app_releases")
 }
