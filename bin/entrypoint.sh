@@ -12,10 +12,11 @@ if [ "$MODE" = "web" ]; then
   /app/app-release-server
 elif [ "$MODE" = "migrate" ]; then
   apt update
-  apt install curl
-  curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
+  apt install curl -y
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - &&
+    apt-get install -y nodejs
 
-  npx prisma migrate deploy || exit 1
+  npx -y prisma migrate deploy || exit 1
 else
   echo "Running command $@"
   exec "$@"
