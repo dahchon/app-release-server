@@ -21,13 +21,6 @@ var (
 	FILE_STORAGE_PATH = os.Getenv("ARS_FILE_STORAGE_PATH")
 )
 
-type AppDetails struct {
-	AppVersion string `json:"app_version"`
-	AppBuild   string `json:"app_build"`
-	AppName    string `json:"app_name"`
-	GitCommit  string `json:"git_commit,omitempty"`
-}
-
 func main() {
 	listenPort := flag.String("port", "8080", "Listen port")
 	flag.Parse()
@@ -67,7 +60,7 @@ func main() {
 		}
 
 		detailsStr := c.FormValue("details")
-		var appDetails AppDetails
+		var appDetails common.AppDetails
 		if err := json.Unmarshal([]byte(detailsStr), &appDetails); err != nil {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 		}
@@ -84,11 +77,6 @@ func main() {
 
 		fileName := filepath.Base(file.Filename)
 		dst := fmt.Sprintf("%s/%s", dir, fileName)
-		// if err := c.SaveUploadedFile(file, dst); err != nil {
-		// 	return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		// }
-		// echo framework save uploaded file to dst
-		// Destination
 
 		src, err := file.Open()
 		if err != nil {
@@ -112,6 +100,8 @@ func main() {
 			db.AppRelease.AppName.Set(appDetails.AppName),
 			db.AppRelease.AppVersion.Set(appDetails.AppVersion),
 			db.AppRelease.AppBuild.Set(appDetails.AppBuild),
+			db.AppRelease.Target.Set(appDetails.Target),
+			db.AppRelease.Arch.Set(appDetails.Arch),
 			db.AppRelease.GitCommit.Set(appDetails.GitCommit),
 			db.AppRelease.MainFileName.Set(fileName),
 			db.AppRelease.UploaderIP.Set(ip),
@@ -125,14 +115,16 @@ func main() {
 		return c.JSON(http.StatusOK, map[string]interface{}{"message": fmt.Sprintf("File %s uploaded successfully", file.Filename), "release": release})
 	})
 
-	e.GET("/apps/:app_name/:app_version/:app_build/:file_name", func(c echo.Context) error {
+	e.GET("/apps/:app_name/:app_version/:app_build/:target/:arch/:file_name", func(c echo.Context) error {
 		appName := c.Param("app_name")
 		appVersion := c.Param("app_version")
 		appBuild := c.Param("app_build")
 		fileName := c.Param("file_name")
+		arch := c.Param("arch")
+		target := c.Param("target")
 
-		if appName == "" || appVersion == "" || appBuild == "" || fileName == "" {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Missing parameters: app name, version, build or file name"})
+		if appName == "" || appVersion == "" || appBuild == "" || fileName == "" || arch == "" || target == "" {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Missing parameters: app name, version, build, arch, target, or file name"})
 		}
 
 		// find this item in db and increase download count
@@ -140,6 +132,8 @@ func main() {
 			db.AppRelease.AppName.Equals(appName),
 			db.AppRelease.AppVersion.Equals(appVersion),
 			db.AppRelease.AppBuild.Equals(appBuild),
+			db.AppRelease.Arch.Equals(arch),
+			db.AppRelease.Target.Equals(target),
 		).Exec(c.Request().Context())
 
 		if err != nil {
@@ -163,15 +157,19 @@ func main() {
 		return c.File(filePath)
 	})
 
-	e.GET("/apps/:app_name/latest", func(c echo.Context) error {
+	e.GET("/apps/:app_name/:target/:arch/latest", func(c echo.Context) error {
 		// get the metadata for the latest release
 		appName := c.Param("app_name")
+		target := c.Param("target")
+		arch := c.Param("arch")
 		if appName == "" {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Missing parameter: app name"})
 		}
 
 		release, err := client.AppRelease.FindFirst(
 			db.AppRelease.AppName.Equals(appName),
+			db.AppRelease.Target.Equals(target),
+			db.AppRelease.Arch.Equals(arch),
 		).OrderBy(
 			db.AppRelease.CreatedAt.Order(db.SortOrderDesc),
 		).Exec(c.Request().Context())
@@ -187,10 +185,11 @@ func main() {
 		requestHost := c.Request().Host
 
 		latest_model := common.AppLatestModel{
-			AppVersion:  release.AppVersion,
-			AppBuild:    release.AppBuild,
-			AppName:     release.AppName,
-			DownloadURL: fmt.Sprintf("https://%s/apps/%s/%s/%s/%s", requestHost, release.AppName, release.AppVersion, release.AppBuild, release.MainFileName),
+			AppVersion: release.AppVersion,
+			AppBuild:   release.AppBuild,
+			AppName:    release.AppName,
+			DownloadURL: fmt.Sprintf("https://%s/apps/%s/%s/%s/%s/%s/%s",
+				requestHost, release.AppName, release.AppVersion, release.AppBuild, release.Target, release.Arch, release.MainFileName),
 		}
 
 		return c.JSON(http.StatusOK, latest_model)
