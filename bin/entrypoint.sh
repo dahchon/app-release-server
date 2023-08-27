@@ -12,8 +12,10 @@ if [ "$MODE" = "web" ]; then
   /app/app-release-server
 elif [ "$MODE" = "migrate" ]; then
   apt update
-  apt install go
-  go run github.com/steebchen/prisma-client-go migrate deploy
+  apt install curl
+  curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
+
+  npx prisma migrate deploy || exit 1
 else
   echo "Running command $@"
   exec "$@"
